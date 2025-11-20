@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kit de Herramientas de Generación de Pipeline para el C4 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/date-fns/3.6.0/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-date-fns/3.0.0/chartjs-adapter-date-fns.min.js"></script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .accordion-content {
+            display: none;
+        }
+        .accordion-toggle.open + .accordion-content {
+            display: block;
+        }
+        .accordion-icon {
+            transition: transform 0.3s ease;
+        }
+        .accordion-toggle.open .accordion-icon {
+            transform: rotate(180deg);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .gantt-container {
+            height: 400px;
+            max-height: 500px;
+            max-width: 1024px;
+        }
+        .metrics-container {
+            height: 320px;
+            max-height: 400px;
+            max-width: 512px;
+        }
+        @media (min-width: 768px) {
+            .metrics-container {
+                height: 350px;
+            }
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #f97316; /* Tailwind orange-600 */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <!-- Paleta Elegida: Inspirada en HubSpot (Naranja y Pizarra) -->
+    <!-- Plan de Estructura de la Aplicación: Una SPA con pestañas para un sentir de kit de herramientas. 1. 'Panel de Control': Resumen de alto nivel y desafío clave. 2. 'Estrategias Centrales': Una lista interactiva en acordeón de 5 estrategias clave (Venta Adicional, ABM, IA, etc.) con un Generador de Borradores IA integrado. 3. 'Plan de Implementación': Un diagrama de Gantt interactivo (barra horizontal de Chart.js) que muestra el cronograma de 4 fases (Preparación, Lanzamiento, Aceleración, Cierre) de Ago-Dic 2025. 4. 'Métricas y KPIs': Un panel con un gráfico de Dona (Fuente de Pipeline) y un gráfico de Barras (Velocidad de Estrategia). Esta estructura guía al usuario desde el 'Por qué' (Panel) hasta el 'Qué' (Estrategias) al 'Cómo' (Plan) y a la 'Medición' (Métricas), un flujo lógico para un kit de herramientas. -->
+    <!-- Opciones de Visualización y Contenido: 1. (Reporte) Datos de Cronograma -> (Meta) Mostrar calendario de implementación -> (Viz) Gráfico de Barras Horizontal (Gantt) -> (Interacción) Tooltip al pasar el ratón -> (Justificación) Mapea perfectamente el "cronograma" solicitado. -> (Librería) Chart.js. 2. (Reporte) Datos de Fuente de Pipeline -> (Meta) Mostrar contribución relativa de las estrategias -> (Viz) Gráfico de Dona -> (Interacción) Tooltip al pasar el ratón -> (Justificación) Estándar para comparación de parte a todo. -> (Librería) Chart.js. 3. (Reporte) Datos de Velocidad de Pipeline -> (Meta) Comparar efectividad de las estrategias -> (Viz) Gráfico de Barras Vertical -> (Interacción) Tooltip al pasar el ratón -> (Justificación) Estándar para comparar categorías discretas. 4. (Reporte) Lista de Estrategias -> (Meta) Organizar y detallar el 'qué' -> (Viz) Acordeón HTML/Tailwind + Botón de Generación de Texto Gemini -> (Interacción) Clic para expandir/colapsar y clic para generar borrador de mensaje (LLM) -> (Justificación) Oculta la complejidad y proporciona contenido accionable directamente. -> (Librería) Vanilla JS + API de Gemini. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-slate-50 font-sans text-slate-900 leading-relaxed">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-orange-700 mb-2">Kit de Herramientas de Generación de Pipeline para el C4 2025</h1>
+            <p class="text-lg text-slate-600">Una guía interactiva para maximizar las ventas de software B2B en el último trimestre.</p>
+        </header>
+
+        <nav class="flex flex-wrap justify-center border-b-2 border-slate-200 mb-8">
+            <button data-tab="tab-dashboard" class="tab-btn active-tab py-3 px-4 md:px-6 font-medium text-slate-500 hover:text-orange-600 border-b-2 border-transparent text-orange-600 border-orange-600">
+                Panel de Control
+            </button>
+            <button data-tab="tab-strategies" class="tab-btn py-3 px-4 md:px-6 font-medium text-slate-500 hover:text-orange-600 border-b-2 border-transparent">
+                Estrategias Centrales
+            </button>
+            <button data-tab="tab-plan" class="tab-btn py-3 px-4 md:px-6 font-medium text-slate-500 hover:text-orange-600 border-b-2 border-transparent">
+                Plan de Implementación
+            </button>
+            <button data-tab="tab-metrics" class="tab-btn py-3 px-4 md:px-6 font-medium text-slate-500 hover:text-orange-600 border-b-2 border-transparent">
+                Métricas y KPIs
+            </button>
+        </nav>
+
+        <main>
+            <section id="tab-dashboard" class="tab-content active bg-white p-6 md:p-8 rounded-lg shadow-sm">
+                <h2 class="text-2xl font-bold text-slate-800 mb-4">El Desafío del C4 2025: Urgencia y Oportunidad</h2>
+                <p class="mb-6 text-slate-700">
+                    Este panel de control proporciona una visión general de los desafíos y oportunidades únicos para las empresas de software B2B en el cuarto trimestre de 2025 (C4). El último trimestre es un período crítico definido por los presupuestos de "úsalo o piérdelo", los ciclos de planificación de 2026 y la inmensa presión para cumplir los objetivos anuales. Este kit de herramientas está diseñado para ayudarte a avanzar con estrategias específicas y de alto ROI.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div class="bg-orange-50 p-6 rounded-lg">
+                        <div class="text-4xl font-bold text-orange-700 mb-2">55%</div>
+                        <p class="font-medium text-slate-700">De los compradores B2B tienen excedentes presupuestarios para gastar en el C4, pero el 70% de esos acuerdos son ganados por el proveedor que ofrece el ROI más claro.</p>
+                    </div>
+                    <div class="bg-orange-50 p-6 rounded-lg">
+                        <div class="text-4xl font-bold text-orange-700 mb-2">30-40%</div>
+                        <p class="font-medium text-slate-700">Del valor anual del pipeline se cierra típicamente en el C4, haciendo que la aceleración del pipeline sea tan crítica como la generación de nuevos leads.</p>
+                    </div>
+                    <div class="bg-orange-50 p-6 rounded-lg">
+                        <div class="text-4xl font-bold text-orange-700 mb-2">3.5x</div>
+                        <p class="font-medium text-slate-700">Tasas de conversión más altas se observan en leads de alta intención (p. ej., solicitudes de demostración) frente a descargas de contenido en la parte superior del embudo (TOFU), lo que exige un enfoque en la parte inferior del embudo (BOFU) para el C4.</p>
+                    </div>
+                </div>
+                <div class="mt-8 bg-slate-100 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-3">Principio Central para el C4 2025</h3>
+                    <p class="text-slate-700">Olvídese de las campañas amplias y lentas de la parte superior del embudo. El éxito en el C4 2025 se basa en un ataque doble: 1) Extraer el máximo valor de su <strong class="font-semibold">base de clientes y pipeline existentes</strong>, y 2) Ejecutar campañas hiper-dirigidas contra <strong class="font-semibold">cuentas de alta intención y listas para comprar</strong>. Cada acción debe ser medida, personalizada y acelerada.</p>
+                </div>
+            </section>
+
+            <section id="tab-strategies" class="tab-content bg-white p-6 md:p-8 rounded-lg shadow-sm">
+                <h2 class="text-2xl font-bold text-slate-800 mb-4">Estrategias Centrales de Pipeline para el C4</h2>
+                <p class="mb-6 text-slate-700">
+                    Esta sección detalla las cinco estrategias de alto impacto para el C4. No son mutuamente excluyentes; están diseñadas para ejecutarse en paralelo para obtener el máximo efecto. Haga clic en cualquier estrategia para expandirla y utilizar la herramienta de IA para generar borradores de mensajes accionables.
+                </p>
+                <div class="space-y-4">
+                    <div class="border border-slate-200 rounded-lg">
+                        <button class="accordion-toggle w-full flex justify-between items-center p-4 bg-slate-100 hover:bg-slate-200 transition duration-200 rounded-t-lg">
+                            <span class="text-lg font-semibold text-orange-700">1. Estrategia de Venta Adicional y Cruzada a Clientes Existentes</span>
+                            <span class="accordion-icon text-2xl text-slate-500 font-bold transform transition-transform duration-300">↓</span>
+                        </button>
+                        <div class="accordion-content p-5 border-t border-slate-200">
+                            <p class="mb-3 text-slate-700"><strong class="font-semibold">Los Datos:</strong> Es 60-70% más probable que venda a un cliente existente que a un nuevo prospecto. Estos acuerdos se cierran ~40% más rápido y tienen un 50% más de valor de contrato promedio (ACV).</p>
+                            <strong class="font-semibold text-slate-800">Elementos de Acción Clave:</strong>
+                            <ul class="list-disc list-inside mt-2 space-y-1 text-slate-700" data-key-actions>
+                                <li>Realizar Revisiones Comerciales Trimestrales (QBRs) de "Planificación 2026" para identificar oportunidades de venta adicional.</li>
+                                <li>Ejecutar una campaña de correo electrónico con "funciones premium" que aún no tienen.</li>
+                                <li>Ofrecer un paquete de "fin de año" o un descuento especial de "complemento" válido hasta el 31 de diciembre.</li>
+                            </ul>
+                            <div class="mt-4 pt-4 border-t border-slate-200">
+                                <button class="generate-draft-btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    data-strategy="1. Estrategia de Venta Adicional y Cruzada a Clientes Existentes"
+                                    data-context="Redactar un correo electrónico de alta urgencia para el C4 a un cliente existente sobre un paquete complementario por tiempo limitado.">
+                                    ✨ Generar Borrador de Plan de Acción ✨
+                                </button>
+                                <div class="draft-output mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300 text-sm whitespace-pre-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg">
+                        <button class="accordion-toggle w-full flex justify-between items-center p-4 bg-slate-100 hover:bg-slate-200 transition duration-200">
+                            <span class="text-lg font-semibold text-orange-700">2. Campañas ABM Hiper-Personalizadas</span>
+                            <span class="accordion-icon text-2xl text-slate-500 font-bold transform transition-transform duration-300">↓</span>
+                        </button>
+                        <div class="accordion-content p-5 border-t border-slate-200">
+                            <p class="mb-3 text-slate-700"><strong class="font-semibold">Los Datos:</strong> El 87% de los especialistas en marketing dicen que ABM (Marketing Basado en Cuentas) ofrece un ROI más alto que cualquier otro tipo de marketing. Las empresas que utilizan ABM han visto un aumento del 75% en el tamaño de los acuerdos de las cuentas objetivo.</p>
+                            <strong class="font-semibold text-slate-800">Elementos de Acción Clave:</strong>
+                            <ul class="list-disc list-inside mt-2 space-y-1 text-slate-700" data-key-actions>
+                                <li>Identificar una lista objetivo de 50-100 cuentas "soñadas" que coincidan con su Perfil de Cliente Ideal (ICP).</li>
+                                <li>Utilizar herramientas de IA para personalizar el alcance en función de las noticias de la empresa, ofertas de trabajo y pila tecnológica.</li>
+                                <li>Ejecutar campañas de anuncios de LinkedIn altamente dirigidas al comité de compras de estas cuentas con mensajes de "Presupuesto de Fin de Año".</li>
+                            </ul>
+                            <div class="mt-4 pt-4 border-t border-slate-200">
+                                <button class="generate-draft-btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    data-strategy="2. Campañas ABM Hiper-Personalizadas"
+                                    data-context="Redactar un correo electrónico de alcance en frío personalizado centrado en la urgencia del 'Presupuesto de Fin de Año' y la alineación con las noticias recientes de la empresa del prospecto.">
+                                    ✨ Generar Borrador de Plan de Acción ✨
+                                </button>
+                                <div class="draft-output mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300 text-sm whitespace-pre-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg">
+                        <button class="accordion-toggle w-full flex justify-between items-center p-4 bg-slate-100 hover:bg-slate-200 transition duration-200">
+                            <span class="text-lg font-semibold text-orange-700">3. Puntuación de Leads e Datos de Intención Impulsados por IA</span>
+                            <span class="accordion-icon text-2xl text-slate-500 font-bold transform transition-transform duration-300">↓</span>
+                        </button>
+                        <div class="accordion-content p-5 border-t border-slate-200">
+                            <p class="mb-3 text-slate-700"><strong class="font-semibold">Los Datos:</strong> Aprovechar la IA para la puntuación de leads puede mejorar las tasas de conversión en un 30%. La monitorización de datos de intención de terceros (p. ej., G2, TrustRadius, Bombora) identifica las cuentas que están investigando activamente su solución *en este momento*.
+                            </p>
+                            <strong class="font-semibold text-slate-800">Elementos de Acción Clave:</strong>
+                            <ul class="list-disc list-inside mt-2 space-y-1 text-slate-700" data-key-actions>
+                                <li>Implementar un modelo de IA para puntuar todos los leads entrantes en función de datos demográficos y firmográficos.</li>
+                                <li>Priorizar el seguimiento de ventas en leads con puntuación >80/100.</li>
+                                <li>Suscribirse a datos de intención para sus 5-10 palabras clave principales y activar un contacto de ventas inmediato a las cuentas "en aumento".</li>
+                            </ul>
+                            <div class="mt-4 pt-4 border-t border-slate-200">
+                                <button class="generate-draft-btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    data-strategy="3. Puntuación de Leads e Datos de Intención Impulsados por IA"
+                                    data-context="Redactar una nota interna corta y urgente para el equipo de SDR sobre cómo clasificar y priorizar leads de intención 'en aumento' en el C4.">
+                                    ✨ Generar Borrador de Plan de Acción ✨
+                                </button>
+                                <div class="draft-output mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300 text-sm whitespace-pre-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg">
+                        <button class="accordion-toggle w-full flex justify-between items-center p-4 bg-slate-100 hover:bg-slate-200 transition duration-200">
+                            <span class="text-lg font-semibold text-orange-700">4. Optimización del Embudo de Entrada de Alta Intención</span>
+                            <span class="accordion-icon text-2xl text-slate-500 font-bold transform transition-transform duration-300">↓</span>
+                        </button>
+                        <div class="accordion-content p-5 border-t border-slate-200">
+                            <p class="mb-3 text-slate-700"><strong class="font-semibold">Los Datos:</strong> Los leads de palabras clave de alta intención (p. ej., "mejor [su software] precios") se convierten 5 veces más que las palabras clave TOFU. La optimización de su formulario de solicitud de demostración puede aumentar las conversiones en un 20-50%.</p>
+                            <strong class="font-semibold text-slate-800">Elementos de Acción Clave:</strong>
+                            <ul class="list-disc list-inside mt-2 space-y-1 text-slate-700" data-key-actions>
+                                <li>Cambiar el 60% de su presupuesto de PPC a palabras clave BOFU (Parte Inferior del Embudo).</li>
+                                <li>Pruebas A/B en su página de destino de "Solicitar Demostración": simplificar el formulario, añadir prueba social (logotipos, testimonios).</li>
+                                <li>Implementar un enlace de calendario inmediato de "Reservar una Hora" en la página de "Gracias" de la demostración para reducir la fricción.</li>
+                            </ul>
+                            <div class="mt-4 pt-4 border-t border-slate-200">
+                                <button class="generate-draft-btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    data-strategy="4. Optimización del Embudo de Entrada de Alta Intención"
+                                    data-context="Redactar un titular de página de destino rápido y de alto impacto y dos puntos clave para un formulario de 'Solicitar Demostración' en el C4. Centrarse en la justificación presupuestaria.">
+                                    ✨ Generar Borrador de Plan de Acción ✨
+                                </button>
+                                <div class="draft-output mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300 text-sm whitespace-pre-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg">
+                        <button class="accordion-toggle w-full flex justify-between items-center p-4 bg-slate-100 hover:bg-slate-200 transition duration-200 rounded-b-lg">
+                            <span class="text-lg font-semibold text-orange-700">5. Aceleración de Socios y Canales</span>
+                            <span class="accordion-icon text-2xl text-slate-500 font-bold transform transition-transform duration-300">↓</span>
+                        </button>
+                        <div class="accordion-content p-5 border-t border-slate-200">
+                            <p class="mb-3 text-slate-700"><strong class="font-semibold">Los Datos:</strong> Los leads provenientes de socios se cierran, en promedio, un 40% más rápido y tienen una tasa de ganancia un 15% mayor debido a la confianza preexistente. Un SPIF (Fondo de Incentivos de Rendimiento de Ventas) en el C4 puede aumentar los leads generados por socios en un 200%.</p>
+                            <strong class="font-semibold text-slate-800">Elementos de Acción Clave:</strong>
+                            <ul class="list-disc list-inside mt-2 space-y-1 text-slate-700" data-key-actions>
+                                <li>Lanzar un SPIF de "Impulso de Pipeline en el C4" para todos los acuerdos de socios registrados cerrados antes del 31 de diciembre.</li>
+                                <li>Realizar un webinar de marca compartida con sus 3 principales socios sobre "Cómo Maximizar su Presupuesto 2025".</li>
+                                <li>Proporcionar a los socios "Tarjetas de Batalla de Fin de Año" y plantillas de correo electrónico preempaquetadas.</li>
+                            </ul>
+                            <div class="mt-4 pt-4 border-t border-slate-200">
+                                <button class="generate-draft-btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    data-strategy="5. Aceleración de Socios y Canales"
+                                    data-context="Redactar un correo electrónico interno corto y emocionante para los socios de canal anunciando el SPIF del C4 y enfatizando la urgencia presupuestaria.">
+                                    ✨ Generar Borrador de Plan de Acción ✨
+                                </button>
+                                <div class="draft-output mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300 text-sm whitespace-pre-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-plan" class="tab-content bg-white p-6 md:p-8 rounded-lg shadow-sm">
+                <h2 class="text-2xl font-bold text-slate-800 mb-4">Plan de Implementación y Cronograma para el C4</h2>
+                <p class="mb-6 text-slate-700">
+                    Esta sección proporciona un plan de implementación concreto y por fases que comienza a finales del C3 para garantizar que esté completamente preparado para ejecutar en el C4. Este diagrama de Gantt visualiza los períodos críticos para la preparación, el lanzamiento, la aceleración y el cierre.
+                </p>
+                <div class="chart-container gantt-container">
+                    <canvas id="ganttChart"></canvas>
+                </div>
+            </section>
+
+            <section id="tab-metrics" class="tab-content bg-white p-6 md:p-8 rounded-lg shadow-sm">
+                <h2 class="text-2xl font-bold text-slate-800 mb-4">Panel de Métricas y KPIs</h2>
+                <p class="mb-6 text-slate-700">
+                    Este es su centro de comando para rastrear el éxito de su plan para el C4. Monitoree estos dos gráficos clave semanalmente. El gráfico de "Contribución al Pipeline" muestra *de dónde* proviene su pipeline, mientras que el gráfico de "Velocidad del Pipeline" muestra *qué tan rápido* se mueve.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-3 text-center">Contribución al Pipeline (% Objetivo)</h3>
+                        <div class="chart-container metrics-container">
+                            <canvas id="donutChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-3 text-center">Velocidad del Pipeline (Días Promedio para Cerrar)</h3>
+                        <div class="chart-container metrics-container">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <script>
+        const API_KEY = "";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const contents = document.querySelectorAll('.tab-content');
+            const activeTabClasses = ['text-orange-600', 'border-orange-600'];
+            const inactiveTabClasses = ['text-slate-500', 'border-transparent'];
+            const draftButtons = document.querySelectorAll('.generate-draft-btn');
+
+            let chartInstances = {};
+
+            async function fetchWithRetry(url, options, retries = 3) {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return await response.json();
+                    } catch (error) {
+                        if (i < retries - 1) {
+                            const delay = Math.pow(2, i) * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+            }
+
+            async function generateMessagingDraft(strategyTitle, context, actionItems, outputElement) {
+                outputElement.innerHTML = '<div class="flex items-center space-x-2 text-orange-700"><div class="loading-spinner"></div><span>Generando borrador del plan de acción para el C4...</span></div>';
+                
+                const keyActionsText = Array.from(actionItems.querySelectorAll('li')).map(li => `- ${li.textContent}`).join('\n');
+
+                const systemPrompt = `Eres un estratega de marketing B2B SaaS astuto. Tu tarea es generar un borrador conciso y altamente accionable para una pieza clave de colateral del C4 (por ejemplo, un correo electrónico en frío, una nota interna o un titular de página de destino) basado en la estrategia proporcionada. Adopta un tono urgente, profesional y basado en datos. Formatea la salida como texto plano apto para uso directo.`;
+                
+                const userQuery = `Estrategia: ${strategyTitle}\nContexto/Meta: ${context}\nAcciones Clave a referenciar: \n${keyActionsText}\n\nGenera el borrador ahora, comenzando con una línea de asunto o un título/encabezado claro.`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                try {
+                    const result = await fetchWithRetry(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        outputElement.textContent = text;
+                    } else {
+                        outputElement.innerHTML = '<p class="text-red-600">Error: No se pudo generar el contenido. Inténtalo de nuevo.</p>';
+                    }
+                } catch (error) {
+                    outputElement.innerHTML = `<p class="text-red-600">Error de red: Falló la conexión con la API. (${error.message})</p>`;
+                }
+            }
+
+            draftButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const strategyTitle = button.dataset.strategy;
+                    const context = button.dataset.context;
+                    const accordionContent = button.closest('.accordion-content');
+                    const actionItems = accordionContent.querySelector('[data-key-actions]');
+                    const outputElement = accordionContent.querySelector('.draft-output');
+
+                    generateMessagingDraft(strategyTitle, context, actionItems, outputElement);
+                });
+            });
+
+            function activateTab(tab) {
+                const tabId = tab.dataset.tab;
+
+                tabs.forEach(t => {
+                    t.classList.remove(...activeTabClasses);
+                    t.classList.add(...inactiveTabClasses);
+                });
+                tab.classList.add(...activeTabClasses);
+                tab.classList.remove(...inactiveTabClasses);
+
+                contents.forEach(content => {
+                    if (content.id === tabId) {
+                        content.classList.add('active');
+                    } else {
+                        content.classList.remove('active');
+                    }
+                });
+
+                if (tabId === 'tab-plan' && !chartInstances.ganttChart) {
+                    initGanttChart();
+                }
+                if (tabId === 'tab-metrics' && !chartInstances.donutChart) {
+                    initDonutChart();
+                    initBarChart();
+                }
+            }
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => activateTab(tab));
+            });
+
+            const accordions = document.querySelectorAll('.accordion-toggle');
+            accordions.forEach(accordion => {
+                accordion.addEventListener('click', () => {
+                    accordion.classList.toggle('open');
+                    const content = accordion.nextElementSibling;
+                    if (content.style.display === "block") {
+                        content.style.display = "none";
+                    } else {
+                        content.style.display = "block";
+                    }
+                });
+            });
+
+            function initGanttChart() {
+                const ctx = document.getElementById('ganttChart').getContext('2d');
+                const data = {
+                    labels: [
+                        'Fase 1: Prep. y Contenido',
+                        'Fase 2: Lanzamiento de Campañas',
+                        'Fase 3: Acelerar Mitad de Embudo',
+                        'Fase 4: Empuje Final de Cierre'
+                    ],
+                    datasets: [{
+                        label: 'Cronograma C4 2025',
+                        data: [
+                            [new Date('2025-08-15').valueOf(), new Date('2025-09-30').valueOf()],
+                            [new Date('2025-10-01').valueOf(), new Date('2025-10-31').valueOf()],
+                            [new Date('2025-11-01').valueOf(), new Date('2025-11-30').valueOf()],
+                            [new Date('2025-12-01').valueOf(), new Date('2025-12-31').valueOf()]
+                        ],
+                        backgroundColor: [
+                            'rgba(249, 115, 22, 0.7)', /* Orange */
+                            'rgba(234, 88, 12, 0.7)',  /* Darker Orange */
+                            'rgba(30, 64, 175, 0.7)',  /* Corporate Blue */
+                            'rgba(71, 85, 105, 0.7)'   /* Slate/Gray */
+                        ],
+                        borderColor: [
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(234, 88, 12, 1)',
+                            'rgba(30, 64, 175, 1)',
+                            'rgba(71, 85, 105, 1)'
+                        ],
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        borderSkipped: false,
+                    }]
+                };
+                chartInstances.ganttChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: data,
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const [start, end] = context.raw;
+                                        const startDate = new Date(start).toLocaleDateString('es-ES');
+                                        const endDate = new Date(end).toLocaleDateString('es-ES');
+                                        return `${context.dataset.label}: ${startDate} - ${endDate}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'month',
+                                    displayFormats: {
+                                        month: 'MMM yyyy'
+                                    }
+                                },
+                                min: '2025-08-01',
+                                max: '2025-12-31',
+                                title: {
+                                    display: true,
+                                    text: 'Fecha'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    autoSkip: false,
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function initDonutChart() {
+                const ctx = document.getElementById('donutChart').getContext('2d');
+                chartInstances.donutChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Campañas ABM', 'Leads IA', 'Venta Adicional Existente', 'Entrada Alta Intención', 'Canal Socios'],
+                        datasets: [{
+                            label: 'Contribución al Pipeline',
+                            data: [30, 20, 25, 15, 10],
+                            backgroundColor: [
+                                'rgba(249, 115, 22, 0.9)', /* Orange-600 */
+                                'rgba(234, 88, 12, 0.9)',  /* Orange-700 */
+                                'rgba(30, 64, 175, 0.9)',  /* Corporate Blue */
+                                'rgba(71, 85, 105, 0.9)',  /* Slate-600 */
+                                'rgba(107, 114, 128, 0.9)' /* Slate-500 */
+                            ],
+                            borderColor: '#ffffff',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        size: 11
+                                    },
+                                    boxWidth: 20,
+                                    padding: 15,
+                                    usePointStyle: true
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function initBarChart() {
+                const ctx = document.getElementById('barChart').getContext('2d');
+                chartInstances.barChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['ABM', 'Leads IA', 'Venta Adicional', 'Entrada', 'Socios'],
+                        datasets: [{
+                            label: 'Días Promedio para Cerrar',
+                            data: [60, 45, 30, 50, 40],
+                            backgroundColor: 'rgba(249, 115, 22, 0.7)', /* Orange-600 */
+                            borderColor: 'rgba(249, 115, 22, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Días'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
